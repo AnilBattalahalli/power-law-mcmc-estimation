@@ -1,0 +1,93 @@
+---
+title: "simulation_results"
+author: "Anil Battalahalli Sreenath"
+date: "12/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+alpha <- 2.2
+lambda <- 0.3
+xmin <- 1.1
+```
+
+```{r}
+best <- function(d){
+  i = which.max(d$y)
+  return(d$x[i])
+}
+```
+
+### Case 1
+
+```{r}
+case_1 <- read.csv("case_1_params.csv")
+```
+
+```{r}
+d <- density(case_1$alpha)
+plot(d, xlab = NA, ylab = NA, main=NA)
+legend(2.72, 2.4, legend=c(sprintf("True Value: %.2f", alpha), sprintf("Estimated: %.2f", best(d))), lty=c(1,1), col=c("red", "blue"), cex=0.8, bg='#ceedf0')
+abline(v=best(d), col="blue")
+abline(v=alpha, col="red")
+```
+
+
+### Case 2:
+
+```{r}
+case_2 <- read.csv("case_2_params.csv")
+```
+
+```{r}
+d <- density(case_2$alpha)
+plot(d, xlab = NA, ylab = NA, main=NA)
+legend(-0.55, 0.8, legend=c(sprintf("True Value: %.2f", alpha), sprintf("Estimated: %.2f", best(d))), lty=c(1,1), col=c("red", "blue"), cex=0.8, bg='#ceedf0')
+abline(v=best(d), col="blue")
+abline(v=alpha, col="red")
+```
+
+```{r}
+d <- density(case_2$xmin)
+plot(d, xlab = NA, ylab = NA, main=NA)
+legend(-0.85, 0.55, legend=c(sprintf("True Value: %.2f", xmin), sprintf("Estimated: %.2f", best(d))), lty=c(1,1), col=c("red", "blue"), cex=0.8, bg='#ceedf0')
+abline(v=best(d), col="blue")
+abline(v=xmin, col="red")
+```
+
+
+### Case 3:
+
+```{r}
+case_3 <- read.csv("case_3_params.csv")
+```
+
+
+```{r}
+d <- density(case_3$alpha)
+plot(d, xlab = NA, ylab = NA, main=NA)
+legend(-1.25, 0.51, legend=c(sprintf("True Value: %.2f", alpha), sprintf("Estimated: %.2f", best(d))), lty=c(1,1), col=c("red", "blue"), cex=0.8, bg='#ceedf0')
+abline(v=best(d), col="blue")
+abline(v=alpha, col="red")
+```
+
+```{r}
+d <- density(case_3$lambda)
+plot(d, xlab = NA, ylab = NA, main=NA)
+legend(2.6, 0.68, legend=c(sprintf("True Value: %.2f", lambda), sprintf("Estimated: %.2f", best(d))), lty=c(1,1), col=c("red", "blue"), cex=0.8, bg='#ceedf0')
+abline(v=best(d), col="blue")
+abline(v=lambda, col="red")
+```
+
+
+```{r}
+d <- density(case_3$xmin)
+plot(d, xlab = NA, ylab = NA, main=NA)
+legend(3.4, 0.48, legend=c(sprintf("True Value: %.2f", xmin), sprintf("Estimated: %.2f", best(d))), lty=c(1,1), col=c("red", "blue"), cex=0.8, bg='#ceedf0')
+abline(v=best(d), col="blue")
+abline(v=xmin, col="red")
+```

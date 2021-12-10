@@ -1,0 +1,263 @@
+---
+title: "simulation_jeffrey"
+author: "Anil Battalahalli Sreenath"
+date: "12/8/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Import stuff
+
+```{r}
+set.seed(84884)
+library(expint)
+library(remotes)
+library(sigmoid)
+```
+
+## Accept-Rejection sampling to generate Power Law samples with Exponential Cutoff
+
+```{r}
+alpha <- 2.2
+lambda <- 0.3
+xmin <- 1.1
+
+theta_true <- c(alpha, lambda, xmin)
+
+c <-  lambda^(1-alpha)/(gammainc(1-alpha, lambda*xmin))
+```
+
+PDF of Power Law with Exponential Distribution
+
+```{r}
+fp <- function(x){
+  if (x > xmin){
+  return(c * ((x^ (-1 * alpha)) * (exp(-1 * lambda * x))))
+  }
+  else {
+    return(0)
+  }
+}
+```
+
+Covering distribution
+
+```{r}
+foo <- function(xmin, alpha){
+  u <- runif(1,0,1)
+  return(xmin*((1-u)^(1/(1-alpha))))
+}
+
+generate <- function(n, xmin, alpha){
+  return(as.numeric(replicate(n, foo(xmin, alpha), simplify=FALSE)))
+}
+
+getCumulative <- function(x, xmin, alpha){
+  return(1-((x/xmin)^(1-alpha)))
+}
+
+covering <- function(i){
+  return(generate(1, xmin, alpha))
+}
+```
+
+```{r}
+c_c <- ((alpha-1)/xmin) * (xmin^alpha)
+covering_pdf <- function(x){
+  if (x > xmin){
+    return(((alpha-1)/xmin)*((x/xmin)^(-alpha)))
+    }
+  else{
+    return(0)
+  }
+}
+```
+
+```{r}
+
+M <- c*(exp(-lambda*(xmin)))/c_c
+```
+
+```{r}
+compute_ratio <- function(u){
+  return(fp(u)/(M*covering_pdf(u)))
+}
+```
+
+Accept-Reject Sampling
+
+```{r}
+samples <- list()
+for (i in 1:500){
+  sample <- covering()
+  r <- compute_ratio(sample)
+  result <- rbinom(1,1,prob=r)
+  if (result == 1){
+    samples <- c(samples, sample)
+  }
+}
+samplesPL <- as.numeric(samples)
+length(samplesPL)
+```
+
+```{r}
+saveRDS(samplesPL, "samplesPL_2o5_1o5_2o1_500samples.rds")
+```
+
+```{r}
+plot(density(samplesPL))
+```
+
+## Bayesian Analysis
+
+1.  Alpha - Jeffrey's prior
+2.  Lambda - known
+3.  xmin - known
+
+```{r}
+lambda <- theta_true[2]
+xmin <- theta_true[3]
+
+# From the known quantities
+```
+
+Gamma function
+
+```{r}
+G <- function(alpha){
+  suppressWarnings(gammainc(1-alpha, lambda*xmin))
+}
+```
+
+First derivative of the Gamma function
+
+```{r}
+Gp1 <- function(alpha){
+  -1 * alpha * suppressWarnings(gammainc(-1*alpha, lambda*xmin))
+}
+```
+
+Second derivative of the Gamma function
+
+```{r}
+Gp2 <- function(alpha){
+  (alpha*(alpha+1)*suppressWarnings(gammainc(-1-alpha, lambda*xmin))) - suppressWarnings(gammainc(-1*alpha, lambda*xmin))
+}
+```
+
+```{r}
+prior_alpha <- function(alpha){
+    j <- ((G(alpha)*Gp2(alpha))-(Gp1(alpha)^2))/(G(alpha)^2)
+    if (is.na(j)){
+      return(0)
+    }
+    if (j < 0){
+      j <- j*-1
+    } else{
+      return(sqrt(j))
+    }
+}
+```
+
+```{r}
+pllikelihood <- function(x, alpha){
+  if (x > xmin){
+    return(((x^(-alpha)) * exp(-lambda * x) * (lambda^(1 - alpha)))/suppressWarnings(gammainc(1-alpha, lambda * xmin)))
+  }
+  else {
+    return(1)
+  }
+}
+```
+
+```{r}
+loglikelihood <- function(data, alpha){
+  lik <- lapply(data, pllikelihood,  alpha=alpha)
+  blee <- lapply(lik, log)
+  return(sum(as.numeric(blee)))
+}
+```
+
+Posterior distribution known up to a constant
+
+```{r}
+logpostfunc <- function(data, alpha){
+  alpha <- as.numeric(alpha)
+  return(loglikelihood(data, alpha)+log(prior_alpha(alpha)))
+}
+```
+
+Proposal
+
+```{r}
+proposal <- function(given){
+  k <- as.numeric(given)
+  return(rexp(1, k))
+}
+```
+
+```{r}
+proposal_pdf <- function(this, given){
+  return(dexp(as.numeric(this), as.numeric(given)))
+}
+```
+
+Metropolis-Hasting for Bayesian Inference
+
+```{r}
+reps <- 100
+acc <- list()
+params <- list()
+pb = txtProgressBar(min = 1, max = reps, initial = 1)
+for (v in 1:reps){
+  nit <- 100
+  accepted <- 0
+  theta <- list()
+  theta[1] <- proposal(2.1)
+  for(i in 2:nit){
+    theta_star <- proposal(theta[i-1])
+    a = (logpostfunc(samplesPL, theta_star) + log(proposal_pdf(theta[i-1], 
+                    theta_star)))-logpostfunc(samplesPL,theta[i-1]) - log(proposal_pdf(theta_star,theta[i-1]))
+    a <- exp(a)
+    if (is.nan(a)){
+      theta[i] <-  theta[i-1]
+    } else if (a > 1){
+      theta[i] <-  theta_star
+      accepted <- accepted+1
+    } else{
+      r = rbinom(1,1,a)
+      if (r == 1){
+        theta[i] <-  theta_star
+        accepted <- accepted+1
+      } else{
+        theta[i] <-  theta[i-1]
+      }
+    }
+  }
+  acc[v] <- accepted/nit
+  post_pdf <- lapply(theta, logpostfunc, data=samplesPL)
+  theta_selected <- theta[which.max(post_pdf)]
+  params[v] <- theta_selected
+  setTxtProgressBar(pb,v)
+}
+```
+
+```{r}
+params <- as.numeric(params)
+write.csv(data.frame(alpha=params), "case_1_params.csv")
+d = density(params)
+0
+```
+
+```{r}
+plot(d, xlab = "alpha", ylab = "Density", main = "Density of alpha on the posterior")
+abline(v=d$x[i], col="blue")
+abline(v=alpha, col="red")
+```
+
+```{r}
+mean(params)
+```
